@@ -1,0 +1,32 @@
+{
+  "name": "throttler",
+  "version": "0.0.1",
+  "description": "Rate limiting transform stream",
+  "main": "dist/index.js",
+  "scripts": {
+    "clean": "rm -rf dist/ node_modules/.cache/ .nyc_output/ coverage/",
+    "format": "prettier-standard src/*.js test/*.js",
+    "lint": "standard src/*.js test/*.js | snazzy",
+    "test": "nyc ava",
+    "coverage": "npm run test && nyc report --reporter=html && sirv coverage -H '0.0.0.0' -p 8000",
+    "build": "rollup -c rollup.config.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "ava": "^2.4.0",
+    "esm": "^3.2.25",
+    "nyc": "^14.1.1",
+    "prettier-standard": "^15.0.1",
+    "rollup": "^1.27.0",
+    "rollup-plugin-cleanup": "^3.1.1",
+    "rollup-plugin-terser": "^5.1.2",
+    "snazzy": "^8.0.0",
+    "standard": "^14.3.1"
+  },
+  "ava": {
+    "require": [
+      "esm"
+    ]
+  }
+}
