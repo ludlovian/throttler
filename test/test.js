@@ -15,15 +15,7 @@ test(
   1024,
   1000
 )
-test(
-  'read 15M at 5M',
-  testStream,
-  15 * 1e6,
-  undefined,
-  undefined,
-  '5M',
-  3000
-)
+test('read 15M at 5M', testStream, 15 * 1e6, undefined, undefined, '5M', 3000)
 test(
   'read in larger chunks, but not throttle',
   testStream,
