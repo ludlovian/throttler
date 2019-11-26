@@ -84,7 +84,7 @@ function getTimeMs () {
 
 function ensureNumber (value) {
   let n = (value + '').toLowerCase()
-  const m = n.endsWith('m') ? 1e6 : n.endsWith('k') ? 1e3 : 1
+  const m = n.endsWith('m') ? 1024 * 1024 : n.endsWith('k') ? 1024 : 1
   n = parseInt(n.replace(/[mk]$/, ''))
   if (isNaN(n)) throw new Error(`Cannot understand number "${value}"`)
   return n * m
