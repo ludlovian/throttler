@@ -17,6 +17,7 @@ function throttler (options) {
     windowMaxTimeMs: 30 * 1000
   });
   resetWindow.call(stream);
+  stream.on('pipe', src => src.once('error', err => stream.emit(err)));
   return stream
 }
 function takeChunk (data, done) {

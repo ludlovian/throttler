@@ -22,6 +22,8 @@ export default function throttler (options) {
 
   resetWindow.call(stream)
 
+  stream.on('pipe', src => src.once('error', err => stream.emit(err)))
+
   return stream
 }
 
