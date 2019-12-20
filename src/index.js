@@ -1,87 +1,89 @@
 'use strict'
 import { Transform } from 'stream'
 
-export default function throttler (options) {
-  if (typeof options !== 'object') options = { rate: options }
-  const bytesPerSecond = ensureNumber(options.rate)
-  const chunkSize = Math.max(Math.ceil(bytesPerSecond / 10))
-
-  const stream = new Transform({
-    ...options,
-    transform (data, encoding, callback) {
-      takeChunk.call(this, data, callback)
-    }
-  })
-
-  Object.assign(stream, {
-    bytesPerSecond,
-    chunkSize,
-    chunkBytes: 0,
-    windowMaxTimeMs: 30 * 1000
-  })
-
-  resetWindow.call(stream)
-
-  stream.on('pipe', src => src.once('error', err => stream.emit(err)))
-
-  return stream
-}
-
-// take a chunk from the data, and process it, calling ourselves
-// to recurse until done
+// throttler
 //
-function takeChunk (data, done) {
-  const chunk = data.slice(0, this.chunkSize - this.chunkBytes)
-  const rest = data.slice(chunk.length)
+// creates a rate-throttling stream
+//
+// throttling is performed by passing the stream through, and once a "chunk"
+// of data has been reached, then assessing if the last bit of that chunk
+// has arrived too early, and delaying if so.
+//
+// The rate is specified in bytes-per-second (with 'k' or 'm' suffixes meaning
+// KiB or MiB). By default, the chunk size is taken to be maximum amount
+// permitted in 100ms. The determination over whether it is too early uses
+// a sliding window of chunk completion times - by default the window
+// is 30 chunks (3 seconds at 100ms)
 
-  if (rest.length) {
-    processChunk.call(this, chunk, takeChunk.bind(this, rest, done))
-  } else {
-    processChunk.call(this, chunk, done)
+class Throttler extends Transform {
+  constructor (options) {
+    if (typeof options !== 'object') options = { rate: options }
+    super(options)
+    const {
+      rate,
+      chunkTime = 100, // at max speed, how big is a chunk (in ms)
+      windowSize = 30 // how many chunks in the window
+    } = options
+    const bytesPerSecond = ensureNumber(rate)
+    Object.assign(this, {
+      bytesPerSecond,
+      chunkSize: Math.max(1, Math.ceil((bytesPerSecond * chunkTime) / 1e3)),
+      chunkBytes: 0,
+      totalBytes: 0,
+      windowSize,
+      window: [[0, Date.now()]]
+    })
+    this.on('pipe', src => src.once('error', err => this.emit('error', err)))
+  }
+
+  _transform (data, enc, callback) {
+    while (true) {
+      if (!data.length) return callback()
+      const chunk = data.slice(0, this.chunkSize - this.chunkBytes)
+      const rest = data.slice(chunk.length)
+      this.chunkBytes += chunk.length
+
+      // if we still do not have a full chunk, then just send it out
+      if (this.chunkBytes < this.chunkSize) {
+        // require('assert').strict.equal(rest.length, 0)
+        this.push(chunk)
+        return callback()
+      }
+
+      // we now have a full chunk
+      this.chunkBytes -= this.chunkSize
+      this.totalBytes += this.chunkSize
+      // require('assert').strict.equal(this.chunkBytes, 0)
+
+      // when should this chunk be going out?
+      const now = Date.now()
+      const [startBytes, startTime] = this.window[0]
+      const eta =
+        startTime + ((this.totalBytes - startBytes) * 1e3) / this.bytesPerSecond
+
+      this.window.push([this.totalBytes, Math.max(now, eta)])
+      if (this.window.length > this.windowSize) {
+        this.window.splice(0, this.windowLength - this.windowSize)
+      }
+
+      // are we too late - so just send out already - and come round again
+      if (now > eta) {
+        this.push(chunk)
+        data = rest
+        continue
+      }
+
+      // so we are too early - so send it later
+      return setTimeout(() => {
+        this.push(chunk)
+        this._transform(rest, enc, callback)
+      }, eta - now)
+    }
   }
 }
 
-// Send a chunk out, possibly after a suitable delay
-function processChunk (data, done) {
-  const size = data.length
-  this.chunkBytes += size
-  this.windowBytes += size
-
-  if (this.chunkBytes < this.chunkSize) {
-    return pushChunk.call(this, data, done)
-  }
-
-  this.chunkBytes -= this.chunkSize
-  const delay = calculateDelay.call(this)
-  if (!delay) {
-    pushChunk.call(this, data, done)
-  } else {
-    setTimeout(pushChunk.bind(this, data, done), delay)
-  }
-}
-
-// send a chunk out immediately and move on
-function pushChunk (chunk, done) {
-  this.push(chunk)
-  done()
-}
-
-function calculateDelay () {
-  const windowTimeMs = getTimeMs() - this.windowStartMs
-  const expectedTimeMs = (1e3 * this.windowBytes) / this.bytesPerSecond
-  // istanbul ignore if
-  if (windowTimeMs > this.windowMaxTimeMs) resetWindow.call(this)
-  return Math.max(expectedTimeMs - windowTimeMs, 0)
-}
-
-function resetWindow () {
-  this.windowStartMs = getTimeMs()
-  this.windowBytes = 0
-}
-
-function getTimeMs () {
-  const [seconds, nanoseconds] = process.hrtime()
-  return seconds * 1e3 + Math.floor(nanoseconds / 1e6)
+export default function throttler (options) {
+  return new Throttler(options)
 }
 
 function ensureNumber (value) {

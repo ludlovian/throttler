@@ -63,6 +63,33 @@ test('complex construction', t => {
   t.true(thr instanceof Transform)
 })
 
+test.cb('roll window', t => {
+  random(4 * 1000 * 1000, 100 * 1000)
+    .pipe(throttle({ rate: '1m', chunkTime: 50, windowLength: 20 }))
+    .on('error', t.end)
+    .on('end', () => t.end())
+    .resume()
+})
+
+test.cb('piped errors passed on', t => {
+  const source = new Readable({
+    read () {}
+  })
+  const err = new Error('oops')
+  const thr = throttle({ rate: '1k' })
+  source.pipe(thr)
+  thr.on('error', e => {
+    t.is(e, err)
+    t.end()
+  })
+  setImmediate(() => {
+    source.push(Buffer.from('foo'))
+    setImmediate(() => {
+      source.emit('error', err)
+    })
+  })
+})
+
 function random (size, chunk, delay) {
   return new Readable({
     read (hint) {

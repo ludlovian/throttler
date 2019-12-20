@@ -1,66 +1,59 @@
 import { Transform } from 'stream';
 
-function throttler (options) {
-  if (typeof options !== 'object') options = { rate: options };
-  const bytesPerSecond = ensureNumber(options.rate);
-  const chunkSize = Math.max(Math.ceil(bytesPerSecond / 10));
-  const stream = new Transform({
-    ...options,
-    transform (data, encoding, callback) {
-      takeChunk.call(this, data, callback);
+class Throttler extends Transform {
+  constructor (options) {
+    if (typeof options !== 'object') options = { rate: options };
+    super(options);
+    const {
+      rate,
+      chunkTime = 100,
+      windowSize = 30
+    } = options;
+    const bytesPerSecond = ensureNumber(rate);
+    Object.assign(this, {
+      bytesPerSecond,
+      chunkSize: Math.max(1, Math.ceil((bytesPerSecond * chunkTime) / 1e3)),
+      chunkBytes: 0,
+      totalBytes: 0,
+      windowSize,
+      window: [[0, Date.now()]]
+    });
+    this.on('pipe', src => src.once('error', err => this.emit('error', err)));
+  }
+  _transform (data, enc, callback) {
+    while (true) {
+      if (!data.length) return callback()
+      const chunk = data.slice(0, this.chunkSize - this.chunkBytes);
+      const rest = data.slice(chunk.length);
+      this.chunkBytes += chunk.length;
+      if (this.chunkBytes < this.chunkSize) {
+        this.push(chunk);
+        return callback()
+      }
+      this.chunkBytes -= this.chunkSize;
+      this.totalBytes += this.chunkSize;
+      const now = Date.now();
+      const [startBytes, startTime] = this.window[0];
+      const eta =
+        startTime + ((this.totalBytes - startBytes) * 1e3) / this.bytesPerSecond;
+      this.window.push([this.totalBytes, Math.max(now, eta)]);
+      if (this.window.length > this.windowSize) {
+        this.window.splice(0, this.windowLength - this.windowSize);
+      }
+      if (now > eta) {
+        this.push(chunk);
+        data = rest;
+        continue
+      }
+      return setTimeout(() => {
+        this.push(chunk);
+        this._transform(rest, enc, callback);
+      }, eta - now)
     }
-  });
-  Object.assign(stream, {
-    bytesPerSecond,
-    chunkSize,
-    chunkBytes: 0,
-    windowMaxTimeMs: 30 * 1000
-  });
-  resetWindow.call(stream);
-  stream.on('pipe', src => src.once('error', err => stream.emit(err)));
-  return stream
-}
-function takeChunk (data, done) {
-  const chunk = data.slice(0, this.chunkSize - this.chunkBytes);
-  const rest = data.slice(chunk.length);
-  if (rest.length) {
-    processChunk.call(this, chunk, takeChunk.bind(this, rest, done));
-  } else {
-    processChunk.call(this, chunk, done);
   }
 }
-function processChunk (data, done) {
-  const size = data.length;
-  this.chunkBytes += size;
-  this.windowBytes += size;
-  if (this.chunkBytes < this.chunkSize) {
-    return pushChunk.call(this, data, done)
-  }
-  this.chunkBytes -= this.chunkSize;
-  const delay = calculateDelay.call(this);
-  if (!delay) {
-    pushChunk.call(this, data, done);
-  } else {
-    setTimeout(pushChunk.bind(this, data, done), delay);
-  }
-}
-function pushChunk (chunk, done) {
-  this.push(chunk);
-  done();
-}
-function calculateDelay () {
-  const windowTimeMs = getTimeMs() - this.windowStartMs;
-  const expectedTimeMs = (1e3 * this.windowBytes) / this.bytesPerSecond;
-  if (windowTimeMs > this.windowMaxTimeMs) resetWindow.call(this);
-  return Math.max(expectedTimeMs - windowTimeMs, 0)
-}
-function resetWindow () {
-  this.windowStartMs = getTimeMs();
-  this.windowBytes = 0;
-}
-function getTimeMs () {
-  const [seconds, nanoseconds] = process.hrtime();
-  return seconds * 1e3 + Math.floor(nanoseconds / 1e6)
+function throttler (options) {
+  return new Throttler(options)
 }
 function ensureNumber (value) {
   let n = (value + '').toLowerCase();
