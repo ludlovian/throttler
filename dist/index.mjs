@@ -36,10 +36,10 @@ class Throttler extends Transform {
       const [startBytes, startTime] = this.window[0];
       const eta =
         startTime + ((this.totalBytes - startBytes) * 1e3) / this.bytesPerSecond;
-      this.window.push([this.totalBytes, Math.max(now, eta)]);
-      if (this.window.length > this.windowSize) {
-        this.window.splice(0, this.windowLength - this.windowSize);
-      }
+      this.window = [
+        ...this.window,
+        [this.totalBytes, Math.max(now, eta)]
+      ].slice(-this.windowSize);
       if (now > eta) {
         this.push(chunk);
         data = rest;
