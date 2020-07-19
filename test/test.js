@@ -54,7 +54,7 @@ function testStream (t, size, chunk, delay, rate, dur) {
 }
 
 test('invalid construction', t => {
-  t.throws(() => throttle('xyz'), Error)
+  t.throws(() => throttle('xyz'), { instanceOf: Error })
 })
 
 test('complex construction', t => {
