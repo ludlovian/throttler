@@ -2,9 +2,9 @@
   "name": "throttler",
   "version": "1.2.0",
   "description": "Rate limiting transform stream",
-  "main": "src/index.js",
-  "module": "src/index.js",
-  "source": "src/index.js",
+  "main": "src/index.mjs",
+  "module": "src/index.mjs",
+  "source": "src/index.mjs",
   "type": "module",
   "scripts": {
     "clean": "rm -rf node_modules/.cache/ coverage/",
