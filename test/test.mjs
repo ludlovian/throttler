@@ -1,9 +1,7 @@
-'use strict'
-
 import test from 'ava'
-import throttle from '../src'
+import { Readable, Transform } from 'stream'
 
-import { Readable } from 'stream'
+import throttle from '../src/index.mjs'
 
 test('read 10k at 10k', testStream, 10000, undefined, undefined, 10000, 1000)
 test(
@@ -59,7 +57,6 @@ test('invalid construction', t => {
 
 test('complex construction', t => {
   const thr = throttle({ rate: '2m' })
-  const { Transform } = require('stream')
   t.true(thr instanceof Transform)
 })
 

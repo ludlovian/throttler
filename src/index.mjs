@@ -1,4 +1,3 @@
-'use strict'
 import { Transform } from 'stream'
 
 // throttler
