@@ -1,5 +1,4 @@
-import assert from 'assert/strict'
-
+// import assert from 'assert/strict'
 export default function throttle (options) {
   if (typeof options !== 'object') options = { rate: options }
   const { chunkTime = 100, windowSize = 30 } = options
@@ -15,12 +14,12 @@ export default function throttle (options) {
         data = data.slice(chunk.length)
         chunkBytes += chunk.length
         if (chunkBytes < chunkSize) {
-          assert.equal(data.length, 0)
+          // assert.equal(data.length, 0)
           yield chunk
           continue
         }
         bytes += chunkSize
-        assert.equal(chunkBytes, chunkSize)
+        // assert.equal(chunkBytes, chunkSize)
         chunkBytes = 0
         const now = Date.now()
         const first = window[0]
