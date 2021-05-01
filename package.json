@@ -4,7 +4,10 @@
   "description": "Rate limiting transform stream",
   "main": "src/index.mjs",
   "module": "src/index.mjs",
-  "source": "src/index.mjs",
+  "exports": {
+      ".": "./src/index.mjs",
+      "./gen": "./src/gen.mjs"
+  },
   "type": "module",
   "scripts": {
     "clean": "rm -rf node_modules/.cache/ coverage/",
