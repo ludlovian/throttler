@@ -1,6 +1,6 @@
 {
   "name": "throttler",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Rate limiting transform stream",
   "main": "src/index.mjs",
   "module": "src/index.mjs",
